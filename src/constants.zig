@@ -3,8 +3,8 @@
 const std = @import("std");
 
 pub const ClapId = enum(u32) {
-    _,
     invalid = std.math.maxInt(u32),
+    _,
 };
 
 /// This is the major ABI and API design
@@ -15,7 +15,7 @@ pub const ClapVersion = extern struct {
     minor: u32,
     revision: u32,
 
-    pub const current = ClapVersion{ .major = 1, .minor = 0, .revision = 2 };
+    pub const current = ClapVersion{ .major = 1, .minor = 1, .revision = 8 };
 
     pub fn isCompatible(version: ClapVersion) bool {
         // versions 0.x.y were used during development stage and aren't compatible
@@ -62,6 +62,8 @@ pub const PluginFeatures = struct {
     pub const distortion = "distortion";
     pub const transient_shaper = "transient-shaper";
     pub const compressor = "compressor";
+    pub const expander = "expander";
+    pub const gate = "gate";
     pub const limiter = "limiter";
 
     pub const flanger = "flanger";

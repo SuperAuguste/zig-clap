@@ -1,18 +1,27 @@
 const std = @import("std");
-const Builder = @import("std").build.Builder;
+const Builder = std.Build;
 
 const examples = &[_][]const u8{"simplest"};
 
 pub fn build(b: *Builder) !void {
-    const mode = b.standardReleaseOptions();
-    inline for (examples) |example| {
-        const lib = b.addSharedLibrary(example, "examples/" ++ example ++ "/" ++ example ++ ".zig", .{ .unversioned = {} });
+    const clap = b.addModule("zig-clap", .{
+        .source_file = .{ .path = "src/clap.zig" },
+    });
 
-        lib.addPackagePath("zig-clap", "src/clap.zig");
-        lib.setBuildMode(mode);
-        lib.setOutputDir("zig-out/" ++ example);
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+
+    inline for (examples) |example| {
+        const lib = b.addSharedLibrary(.{
+            .name = example,
+            .root_source_file = .{ .path = "examples/" ++ example ++ "/" ++ example ++ ".zig" },
+            .target = target,
+            .optimize = optimize,
+        });
+
+        lib.addModule("zig-clap", clap);
 
         var step = b.step(example, "Build example \"" ++ example ++ "\"");
-        step.dependOn(&lib.step);
+        step.dependOn(&b.addInstallArtifact(lib).step);
     }
 }

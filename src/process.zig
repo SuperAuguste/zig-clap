@@ -1,4 +1,5 @@
 const AudioBuffer = @import("audio_buffer.zig").AudioBuffer;
+const events = @import("events.zig");
 
 pub const ProcessStatus = enum(i32) {
     /// Processing failed. The output buffer must be discarded.
@@ -34,7 +35,7 @@ pub const Process = extern struct {
 
     /// time info at sample 0
     /// If null, then this is a free running host, no transport events will be provided
-    transport: ?*const EventTransport,
+    transport: ?*const events.EventTransport,
 
     /// Audio buffers, they must have the same count as specified
     /// by clap_plugin_audio_ports->get_count().
@@ -48,6 +49,6 @@ pub const Process = extern struct {
     ///
     /// Events must be sorted by time.
     /// The input event list can't be modified.
-    in_events: *const InputEvents,
-    out_events: *const OutputEvents,
+    in_events: *const events.InputEvents,
+    out_events: *const events.OutputEvents,
 };

@@ -21,10 +21,13 @@ const MyPlugin = struct {
 };
 
 pub fn myPluginInit(plugin: *const clap.plugin.Plugin) bool {
+    _ = plugin;
     return true;
 }
 
-pub fn myPluginDestroy(plugin: *const clap.plugin.Plugin) void {}
+pub fn myPluginDestroy(plugin: *const clap.plugin.Plugin) void {
+    _ = plugin;
+}
 
 pub fn myPluginActivate(
     plugin: *const clap.plugin.Plugin,
@@ -32,18 +35,29 @@ pub fn myPluginActivate(
     min_frames_count: u32,
     max_frames_count: u32,
 ) bool {
+    _ = max_frames_count;
+    _ = min_frames_count;
+    _ = sample_rate;
+    _ = plugin;
     return true;
 }
 
-pub fn myPluginDeactivate(plugin: *const clap.plugin.Plugin) void {}
+pub fn myPluginDeactivate(plugin: *const clap.plugin.Plugin) void {
+    _ = plugin;
+}
 
 pub fn myPluginStartProcessing(plugin: *const clap.plugin.Plugin) bool {
+    _ = plugin;
     return true;
 }
 
-pub fn myPluginStopProcessing(plugin: *const clap.plugin.Plugin) void {}
+pub fn myPluginStopProcessing(plugin: *const clap.plugin.Plugin) void {
+    _ = plugin;
+}
 
-pub fn myPluginReset(plugin: *const clap.plugin.Plugin) void {}
+pub fn myPluginReset(plugin: *const clap.plugin.Plugin) void {
+    _ = plugin;
+}
 
 // static void my_plug_process_event(my_plug_t *plug, const clap_event_header_t *hdr) {
 //    if (hdr->space_id == CLAP_CORE_EVENT_SPACE_ID) {
@@ -158,10 +172,14 @@ pub fn myPluginReset(plugin: *const clap.plugin.Plugin) void {}
 // }
 
 pub fn myPluginGetExtension(plugin: *const clap.plugin.Plugin, id: [*:0]const u8) ?*const anyopaque {
+    _ = id;
+    _ = plugin;
     return null;
 }
 
-pub fn myPluginOnMainThread(plugin: *const clap.plugin.Plugin) void {}
+pub fn myPluginOnMainThread(plugin: *const clap.plugin.Plugin) void {
+    _ = plugin;
+}
 
 // clap_plugin_t *my_plug_create(const clap_host_t *host) {
 //    my_plug_t *p = calloc(1, sizeof(*p));

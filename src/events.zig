@@ -10,13 +10,13 @@ pub const EventHeader = extern struct {
     /// event space, see clap_host_event_registry
     space_id: u16,
     /// event type
-    kind: EventKind,
+    type: EventType,
     /// see clap_event_flags
     flags: EventFlags,
 };
 
 // The clap core event space
-// static const CLAP_CONSTEXPR uint16_t CLAP_CORE_EVENT_SPACE_ID = 0;
+pub const core_event_space_id: u16 = 0;
 
 pub const EventFlags = enum(u32) {
     /// Indicate a live user event, for example a user turning a phisical knob
@@ -44,7 +44,7 @@ pub const EventFlags = enum(u32) {
 ///
 /// The plugins are encouraged to be able to handle note events encoded as raw midi or midi2,
 /// or implement clap_plugin_event_filter and reject raw midi and midi2 events.
-pub const EventKind = enum(u16) {
+pub const EventType = enum(u16) {
     // NOTE_ON and NOTE_OFF represents a key pressed and key released event.
     // A NOTE_ON with a velocity of 0 is valid and should not be interpreted as a NOTE_OFF.
     //
@@ -226,7 +226,7 @@ pub const TransportFlags = enum(u32) {
     is_loop_active = 1 << 6,
     is_within_pre_roll = 1 << 7,
 
-    pub fn is(value: ConstantMask, desired: ConstantMask) bool {
+    pub fn is(value: constants.ConstantMask, desired: constants.ConstantMask) bool {
         return (@enumToInt(value) & @enumToInt(desired)) != 0;
     }
 };
@@ -278,7 +278,7 @@ pub const EventMidiSysex = extern struct {
     size: u32,
 
     pub fn slice(event: EventMidiSysex) []u8 {
-        return event.buffer[0..size];
+        return event.buffer[0..event.size];
     }
 };
 
