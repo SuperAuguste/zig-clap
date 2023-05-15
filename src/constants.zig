@@ -2,6 +2,16 @@
 
 const std = @import("std");
 
+/// String capacity for names that can be displayed to the user.
+pub const name_size = 256;
+
+/// String capacity for describing a path, like a parameter in a module hierarchy or path within a
+/// set of nested track groups.
+///
+/// This is not suited for describing a file path on the disk, as NTFS allows up to 32K long
+/// paths.
+pub const path_size = 1024;
+
 pub const ClapId = enum(u32) {
     invalid = std.math.maxInt(u32),
     _,

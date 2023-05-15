@@ -1,7 +1,7 @@
 const std = @import("std");
 const Builder = std.Build;
 
-const examples = &[_][]const u8{"simplest"};
+const examples = &[_][]const u8{"amp"};
 
 pub fn build(b: *Builder) !void {
     const clap = b.addModule("zig-clap", .{

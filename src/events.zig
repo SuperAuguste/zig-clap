@@ -18,18 +18,18 @@ pub const EventHeader = extern struct {
 // The clap core event space
 pub const core_event_space_id: u16 = 0;
 
-pub const EventFlags = enum(u32) {
+pub const EventFlags = packed struct(u32) {
     /// Indicate a live user event, for example a user turning a phisical knob
     /// or playing a physical key.
-    is_live = 1 << 0,
+    is_live: bool,
 
     /// Indicate that the event should not be recorded.
     /// For example this is useful when a parameter changes because of a MIDI CC,
     /// because if the host records both the MIDI CC automation and the parameter
     /// automation there will be a conflict.
-    dont_record = 1 << 1,
+    dont_record: bool,
 
-    _,
+    _unallocated: u30,
 };
 
 /// Some of the following events overlap, a note on can be expressed with:
@@ -216,19 +216,17 @@ pub const EventParamGesture = extern struct {
     param_id: constants.ClapId,
 };
 
-pub const TransportFlags = enum(u32) {
-    has_tempo = 1 << 0,
-    has_beats_timeline = 1 << 1,
-    has_seconds_timeline = 1 << 2,
-    has_time_signature = 1 << 3,
-    is_playing = 1 << 4,
-    is_recording = 1 << 5,
-    is_loop_active = 1 << 6,
-    is_within_pre_roll = 1 << 7,
+pub const TransportFlags = packed struct(u32) {
+    has_tempo: bool,
+    has_beats_timeline: bool,
+    has_seconds_timeline: bool,
+    has_time_signature: bool,
+    is_playing: bool,
+    is_recording: bool,
+    is_loop_active: bool,
+    is_within_pre_roll: bool,
 
-    pub fn is(value: constants.ConstantMask, desired: constants.ConstantMask) bool {
-        return (@enumToInt(value) & @enumToInt(desired)) != 0;
-    }
+    _unallocated: u24,
 };
 
 pub const EventTransport = extern struct {

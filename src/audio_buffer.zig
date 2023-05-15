@@ -1,11 +1,8 @@
-pub const ConstantMask = enum(u64) {
-    left_constant = 1 << 0,
-    right_constant = 1 << 1,
-    _,
+pub const ConstantMask = packed struct(u64) {
+    left_constant: bool,
+    right_constant: bool,
 
-    pub fn is(value: ConstantMask, desired: ConstantMask) bool {
-        return (@enumToInt(value) & @enumToInt(desired)) != 0;
-    }
+    _unallocated: u62,
 };
 
 /// Sample code for reading a stereo buffer:

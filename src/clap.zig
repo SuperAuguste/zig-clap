@@ -2,7 +2,7 @@ pub const audio_buffer = @import("audio_buffer.zig");
 pub const constants = @import("constants.zig");
 pub const events = @import("events.zig");
 pub const Host = @import("host.zig").Host;
-pub const plugin = @import("plugin.zig");
+pub const Plugin = @import("plugin.zig").Plugin;
 pub const Process = @import("process.zig").Process;
 
 const std = @import("std");
@@ -18,18 +18,18 @@ fn castPluginType(comptime PluginType: type, plugin_data: *anyopaque) *PluginTyp
 
 fn PluginStub(comptime PluginType: type) type {
     return struct {
-        fn init(pl: *const plugin.Plugin) callconv(.C) bool {
+        fn init(pl: *const Plugin) callconv(.C) bool {
             return PluginType.init(castPluginType(PluginType, pl.plugin_data));
         }
 
-        fn destroy(pl: *const plugin.Plugin) callconv(.C) void {
+        fn destroy(pl: *const Plugin) callconv(.C) void {
             PluginType.deinit(castPluginType(PluginType, pl.plugin_data));
             std.heap.page_allocator.destroy(castPluginType(PluginType, pl.plugin_data));
             std.heap.page_allocator.destroy(pl);
         }
 
         fn activate(
-            pl: *const plugin.Plugin,
+            pl: *const Plugin,
             sample_rate: f64,
             min_frames_count: u32,
             max_frames_count: u32,
@@ -42,32 +42,32 @@ fn PluginStub(comptime PluginType: type) type {
             );
         }
 
-        fn deactivate(pl: *const plugin.Plugin) callconv(.C) void {
+        fn deactivate(pl: *const Plugin) callconv(.C) void {
             PluginType.deactivate(castPluginType(PluginType, pl.plugin_data));
         }
 
-        fn startProcessing(pl: *const plugin.Plugin) callconv(.C) bool {
+        fn startProcessing(pl: *const Plugin) callconv(.C) bool {
             return PluginType.startProcessing(castPluginType(PluginType, pl.plugin_data));
         }
 
-        fn stopProcessing(pl: *const plugin.Plugin) callconv(.C) void {
+        fn stopProcessing(pl: *const Plugin) callconv(.C) void {
             PluginType.stopProcessing(castPluginType(PluginType, pl.plugin_data));
         }
 
-        fn reset(pl: *const plugin.Plugin) callconv(.C) void {
+        fn reset(pl: *const Plugin) callconv(.C) void {
             PluginType.reset(castPluginType(PluginType, pl.plugin_data));
         }
 
-        fn process(pl: *const plugin.Plugin, proc: *const Process) callconv(.C) Process.Status {
+        fn process(pl: *const Plugin, proc: *const Process) callconv(.C) Process.Status {
             return PluginType.process(castPluginType(PluginType, pl.plugin_data), proc);
         }
 
         // TODO: Bindings for this
-        fn getExtension(pl: *const plugin.Plugin, id: [*:0]const u8) callconv(.C) ?*const anyopaque {
+        fn getExtension(pl: *const Plugin, id: [*:0]const u8) callconv(.C) ?*const anyopaque {
             return PluginType.getExtension(castPluginType(PluginType, pl.plugin_data), std.mem.span(id));
         }
 
-        fn onMainThread(pl: *const plugin.Plugin) callconv(.C) void {
+        fn onMainThread(pl: *const Plugin) callconv(.C) void {
             PluginType.onMainThread(castPluginType(PluginType, pl.plugin_data));
         }
     };
@@ -78,11 +78,11 @@ pub fn exportPlugins(
     plugins: anytype,
 ) void {
     const Factory = struct {
-        fn getPluginCount(_: *const plugin.PluginFactory) callconv(.C) u32 {
+        fn getPluginCount(_: *const Plugin.Factory) callconv(.C) u32 {
             return plugins.len;
         }
 
-        fn getPluginDescriptor(_: *const plugin.PluginFactory, index: u32) callconv(.C) *const plugin.PluginDescriptor {
+        fn getPluginDescriptor(_: *const Plugin.Factory, index: u32) callconv(.C) *const Plugin.Descriptor {
             inline for (plugins, 0..) |Pl, i| {
                 if (i == index)
                     return &Pl.descriptor;
@@ -92,14 +92,14 @@ pub fn exportPlugins(
         }
 
         fn createPlugin(
-            _: *const plugin.PluginFactory,
+            _: *const Plugin.Factory,
             host: *const Host,
             plugin_id: [*:0]const u8,
-        ) callconv(.C) *const plugin.Plugin {
+        ) callconv(.C) *const Plugin {
             _ = host;
             inline for (plugins) |Pl| {
                 if (std.mem.eql(u8, std.mem.span(Pl.descriptor.id), std.mem.span(plugin_id))) {
-                    var plug = std.heap.page_allocator.create(plugin.Plugin) catch @panic("OOM");
+                    var plug = std.heap.page_allocator.create(Plugin) catch @panic("OOM");
                     var data = std.heap.page_allocator.create(Pl) catch @panic("OOM");
 
                     const stub = PluginStub(Pl);
@@ -139,9 +139,9 @@ pub fn exportPlugins(
                 d();
         }
 
-        fn getFactory(factory_id: [*:0]const u8) callconv(.C) ?*const plugin.PluginFactory {
+        fn getFactory(factory_id: [*:0]const u8) callconv(.C) ?*const Plugin.Factory {
             if (std.mem.eql(u8, std.mem.span(factory_id), "clap.plugin-factory")) {
-                return &plugin.PluginFactory{
+                return &Plugin.Factory{
                     .getPluginCount = &Factory.getPluginCount,
                     .getPluginDescriptor = &Factory.getPluginDescriptor,
                     .createPlugin = &Factory.createPlugin,
@@ -151,7 +151,7 @@ pub fn exportPlugins(
             return null;
         }
 
-        export const clap_entry = plugin.PluginEntry{
+        export const clap_entry = Plugin.Entry{
             .init = &init,
             .deinit = &deinit,
             .getFactory = &getFactory,
