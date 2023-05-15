@@ -1,7 +1,7 @@
 const constants = @import("constants.zig");
 const ClapVersion = constants.ClapVersion;
 const Host = @import("host.zig").Host;
-const process = @import("process.zig");
+const Process = @import("process.zig").Process;
 
 pub const PluginDescriptor = extern struct {
     /// Initialized to current version
@@ -29,7 +29,7 @@ pub const PluginDescriptor = extern struct {
     /// Arbitrary list of keywords.
     /// They can be matched by the host indexer and used to classify the plugin.
     /// The array of pointers must be null terminated.
-    features: [*:0][*:0]const u8,
+    features: [*:null]const ?[*:0]const u8,
 };
 
 /// This interface is the entry point of the dynamic library.
@@ -66,17 +66,20 @@ pub const PluginEntry = extern struct {
     ///
     /// If the initialization depends upon expensive computation, maybe try to do them ahead of time
     /// and cache the result.
-    init: fn (plugin_path: [*:0]const u8) bool,
+    ///
+    /// If init() returns false, then the host must not call deinit() nor any other clap
+    /// related symbols from the DSO.
+    init: *const fn (plugin_path: [*:0]const u8) callconv(.C) bool,
 
     /// No more calls into the DSO must be made after calling deinit().
-    deinit: fn () void,
+    deinit: *const fn () callconv(.C) void,
 
     /// Get the pointer to a factory. See plugin-factory.h for an example.
     ///
     /// Returns null if the factory is not provided.
     /// The returned pointer must *not* be freed by the caller.
     /// Should be a const pointer but Zig doesn't support *const fn atm :(
-    getFactory: fn (factory_id: [*:0]const u8) ?*const PluginFactory,
+    getFactory: *const fn (factory_id: [*:0]const u8) callconv(.C) ?*const PluginFactory,
 };
 
 /// Every methods must be thread-safe.
@@ -86,20 +89,24 @@ pub const PluginEntry = extern struct {
 pub const PluginFactory = struct {
     /// Get the number of plugins available.
     /// [thread-safe]
-    getPluginCount: fn (factory: *const PluginFactory) u32,
+    getPluginCount: *const fn (factory: *const PluginFactory) callconv(.C) u32,
 
     /// Retrieves a plugin descriptor by its index.
     /// Returns null in case of error.
     /// The descriptor must not be freed.
     /// [thread-safe]
-    getPluginDescriptor: fn (factory: *const PluginFactory, index: u32) *const PluginDescriptor,
+    getPluginDescriptor: *const fn (factory: *const PluginFactory, index: u32) callconv(.C) *const PluginDescriptor,
 
     /// Create a clap_plugin by its plugin_id.
     /// The returned pointer must be freed by calling plugin->destroy(plugin);
     /// The plugin is not allowed to use the host callbacks in the create method.
     /// Returns null in case of error.
     /// [thread-safe]
-    createPlugin: fn (factory: *const PluginFactory, host: *const Host, plugin_id: [*:0]const u8) *const Plugin,
+    createPlugin: *const fn (
+        factory: *const PluginFactory,
+        host: *const Host,
+        plugin_id: [*:0]const u8,
+    ) callconv(.C) *const Plugin,
 };
 
 // CLAP_EXPORT extern const clap_plugin_entry_t clap_entry;
@@ -113,12 +120,12 @@ pub const Plugin = extern struct {
     /// Must be called after creating the plugin.
     /// If init returns false, the host must destroy the plugin instance.
     /// [main-thread]
-    init: fn (plugin: *const Plugin) bool,
+    init: *const fn (plugin: *const Plugin) callconv(.C) bool,
 
     /// Free the plugin and its resources.
     /// It is not required to deactivate the plugin prior to this call.
     /// [main-thread & !active]
-    destroy: fn (plugin: *const Plugin) void,
+    destroy: *const fn (plugin: *const Plugin) callconv(.C) void,
 
     /// Activate and deactivate the plugin.
     /// In this call the plugin may allocate memory and prepare everything needed for the process
@@ -127,23 +134,23 @@ pub const Plugin = extern struct {
     /// Once activated the latency and port configuration must remain constant, until deactivation.
     ///
     /// [main-thread & !active_state]
-    activate: fn (
+    activate: *const fn (
         plugin: *const Plugin,
         sample_rate: f64,
         min_frames_count: u32,
         max_frames_count: u32,
-    ) bool,
+    ) callconv(.C) bool,
 
     /// [main-thread & active_state]
-    deactivate: fn (plugin: *const Plugin) void,
+    deactivate: *const fn (plugin: *const Plugin) callconv(.C) void,
 
     /// Call start processing before processing.
     /// [audio-thread & active_state & !processing_state]
-    startProcessing: fn (plugin: *const Plugin) bool,
+    startProcessing: *const fn (plugin: *const Plugin) callconv(.C) bool,
 
     /// Call stop processing before sending the plugin to sleep.
     /// [audio-thread & active_state & processing_state]
-    stopProcessing: fn (plugin: *const Plugin) void,
+    stopProcessing: *const fn (plugin: *const Plugin) callconv(.C) void,
 
     /// - Clears all buffers, performs a full reset of the processing state (filters, oscillators,
     ///   enveloppes, lfo, ...) and kills all voices.
@@ -151,19 +158,19 @@ pub const Plugin = extern struct {
     /// - clap_process.steady_time may jump backward.
     ///
     /// [audio-thread & active_state]
-    reset: fn (plugin: *const Plugin) void,
+    reset: *const fn (plugin: *const Plugin) callconv(.C) void,
 
     /// process audio, events, ...
     /// [audio-thread & active_state & processing_state]
-    process: fn (plugin: *const Plugin, process: *const process.Process) process.ProcessStatus,
+    process: *const fn (plugin: *const Plugin, process: *const Process) callconv(.C) Process.Status,
 
     /// Query an extension.
     /// The returned pointer is owned by the plugin.
     /// [thread-safe]
-    getExtension: fn (plugin: *const Plugin, id: [*:0]const u8) ?*const anyopaque,
+    getExtension: *const fn (plugin: *const Plugin, id: [*:0]const u8) callconv(.C) ?*const anyopaque,
 
     /// Called by the host on the main thread in response to a previous call to:
     ///   host.requestCallback();
     /// [main-thread]
-    onMainThread: fn (plugin: *const Plugin) void,
+    onMainThread: *const fn (plugin: *const Plugin) callconv(.C) void,
 };

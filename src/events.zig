@@ -296,9 +296,9 @@ pub const InputEvents = extern struct {
     /// reserved pointer for the list
     ctx: *anyopaque,
 
-    size: fn (list: *const InputEvents) u32,
+    size: *const fn (list: *const InputEvents) u32,
     /// Don't free the returned event, it belongs to the list
-    get: fn (list: *const InputEvents, index: u32) *const EventHeader,
+    get: *const fn (list: *const InputEvents, index: u32) *const EventHeader,
 
     pub const Iterator = struct {
         events: *const InputEvents,
@@ -327,7 +327,7 @@ pub const OutputEvents = extern struct {
 
     // Pushes a copy of the event
     // returns false if the event could not be pushed to the queue (out of memory?)
-    tryPush: fn (list: *const OutputEvents, event: *const EventHeader) bool,
+    tryPush: *const fn (list: *const OutputEvents, event: *const EventHeader) bool,
 
     pub fn push(list: *const OutputEvents, event: *const EventHeader) error{OutOfMemory}!void {
         if (!list.tryPush(list, event)) return error.OutOfMemory;

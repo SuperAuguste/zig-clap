@@ -20,19 +20,19 @@ pub const Host = extern struct {
 
     /// Query an extension.
     /// [thread-safe]
-    getExtension: fn (host: *const Host, extension_id: [*:0]const u8) *const anyopaque,
+    getExtension: *const fn (host: *const Host, extension_id: [*:0]const u8) *const anyopaque,
 
     /// Request the host to deactivate and then reactivate the plugin.
     /// The operation may be delayed by the host.
     /// [thread-safe]
-    requestRestart: fn (host: *const Host) void,
+    requestRestart: *const fn (host: *const Host) void,
 
     /// Request the host to activate and start processing the plugin.
     /// This is useful if you have external IO and need to wake up the plugin from "sleep".
     /// [thread-safe]
-    requestProcess: fn (host: *const Host) void,
+    requestProcess: *const fn (host: *const Host) void,
 
     /// Request the host to schedule a call to plugin.onMainThread() on the main thread.
     /// [thread-safe]
-    requestCallback: fn (host: *const Host) void,
+    requestCallback: *const fn (host: *const Host) void,
 };

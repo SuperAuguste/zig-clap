@@ -21,7 +21,18 @@ pub fn build(b: *Builder) !void {
 
         lib.addModule("zig-clap", clap);
 
+        var install = b.addInstallArtifact(lib);
+        install.dest_sub_path = try std.mem.concat(b.allocator, u8, &.{
+            try std.zig.binNameAlloc(b.allocator, .{
+                .root_name = example,
+                .target = target.toTarget(),
+                .output_mode = .Lib,
+                .link_mode = .Dynamic,
+            }),
+            ".clap",
+        });
+
         var step = b.step(example, "Build example \"" ++ example ++ "\"");
-        step.dependOn(&b.addInstallArtifact(lib).step);
+        step.dependOn(&install.step);
     }
 }
