@@ -21,7 +21,7 @@ pub fn build(b: *Builder) !void {
 
         lib.addModule("zig-clap", clap);
 
-        var install = b.addInstallArtifact(lib);
+        var install = b.addInstallArtifact(lib, .{});
         install.dest_sub_path = try std.mem.concat(b.allocator, u8, &.{
             try std.zig.binNameAlloc(b.allocator, .{
                 .root_name = example,
