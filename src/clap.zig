@@ -13,7 +13,7 @@ const ExportFunctions = struct {
 };
 
 fn castPluginType(comptime PluginType: type, plugin_data: *anyopaque) *PluginType {
-    return @ptrCast(*PluginType, @alignCast(@alignOf(PluginType), plugin_data));
+    return @ptrCast(@alignCast(plugin_data));
 }
 
 fn PluginStub(comptime PluginType: type) type {
@@ -106,7 +106,7 @@ pub fn exportPlugins(
                     plug.* = .{
                         .descriptor = &Pl.descriptor,
 
-                        .plugin_data = @ptrCast(*anyopaque, data),
+                        .plugin_data = @ptrCast(data),
 
                         .init = &stub.init,
                         .destroy = &stub.destroy,
