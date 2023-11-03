@@ -113,6 +113,6 @@ pub const FixedPointTime = enum(i64) {
     _,
 
     pub fn fromFloat(float: f64) FixedPointTime {
-        return @intToEnum(FixedPointTime, @floatToInt(i64, std.math.round(@intToFloat(f64, 1 << 31) * float)));
+        return @as(FixedPointTime, @enumFromInt(@as(i64, @intFromFloat(std.math.round(@as(f64, @floatFromInt(1 << 31)) * float)))));
     }
 };
