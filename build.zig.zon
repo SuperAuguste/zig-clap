@@ -1,0 +1,8 @@
+.{
+    .name = .zls,
+    .version = "0.0.1",
+    .minimum_zig_version = "0.14.0",
+    .dependencies = .{},
+    .paths = .{""},
+    .fingerprint = 0xa66330b961ac4f72,
+}

@@ -1,160 +1,200 @@
-pub const audio_buffer = @import("audio_buffer.zig");
-pub const constants = @import("constants.zig");
-pub const events = @import("events.zig");
-pub const Host = @import("host.zig").Host;
-pub const Plugin = @import("plugin.zig").Plugin;
-pub const Process = @import("process.zig").Process;
+pub const ClapVersion = extern struct {
+    pub const current: ClapVersion = .{ .major = 1, .minor = 2, .revision = 6 };
 
-const std = @import("std");
-
-const ExportFunctions = struct {
-    init: ?fn (plugin_path: []const u8) anyerror!void = null,
-    deinit: ?fn () anyerror!void = null,
+    major: u32,
+    minor: u32,
+    revision: u32,
 };
 
-fn castPluginType(comptime PluginType: type, plugin_data: *anyopaque) *PluginType {
-    return @ptrCast(*PluginType, @alignCast(@alignOf(PluginType), plugin_data));
-}
+pub const PluginEntry = extern struct {
+    clap_version: ClapVersion,
+    /// Must be defended with a mutex or counter if complex behavior inside.
+    init: *const fn (plugin_path: [*:0]const u8) callconv(.c) bool,
+    /// Must be defended with a mutex or counter if complex behavior inside.
+    deinit: *const fn () callconv(.c) void,
+    /// Must be thread-safe.
+    getFactory: *const fn (factory: [*:0]const u8) callconv(.c) ?*const anyopaque,
+};
 
-fn PluginStub(comptime PluginType: type) type {
-    return struct {
-        fn init(pl: *const Plugin) callconv(.C) bool {
-            return PluginType.init(castPluginType(PluginType, pl.plugin_data));
-        }
+pub const PluginFactory = extern struct {
+    pub const id = "clap.plugin-factory";
+    /// Must be thread-safe.
+    getPluginCount: *const fn (plugin_factory: *const PluginFactory) callconv(.c) u32,
+    /// Must be thread-safe.
+    getPluginDescriptor: *const fn (plugin_factory: *const PluginFactory, index: u32) callconv(.c) ?*const PluginDescriptor,
+    /// Must be thread-safe.
+    createPlugin: *const fn (plugin_factory: *const PluginFactory, host: *const Host, plugin_id: [*:0]const u8) callconv(.c) ?*const Plugin,
+};
 
-        fn destroy(pl: *const Plugin) callconv(.C) void {
-            PluginType.deinit(castPluginType(PluginType, pl.plugin_data));
-            std.heap.page_allocator.destroy(castPluginType(PluginType, pl.plugin_data));
-            std.heap.page_allocator.destroy(pl);
-        }
+pub const Host = extern struct {
+    clap_version: ClapVersion,
 
-        fn activate(
-            pl: *const Plugin,
-            sample_rate: f64,
-            min_frames_count: u32,
-            max_frames_count: u32,
-        ) callconv(.C) bool {
-            return PluginType.activate(
-                castPluginType(PluginType, pl.plugin_data),
-                sample_rate,
-                min_frames_count,
-                max_frames_count,
-            );
-        }
+    host_data: ?*anyopaque,
+    name: [*:0]const u8,
+    vendor: ?[*:0]const u8,
+    url: ?[*:0]const u8,
+    version: [*:0]const u8,
 
-        fn deactivate(pl: *const Plugin) callconv(.C) void {
-            PluginType.deactivate(castPluginType(PluginType, pl.plugin_data));
-        }
+    /// Must be thread-safe.
+    getExtension: *const fn (host: *const Host, extension_id: [*:0]const u8) callconv(.c) ?*const anyopaque,
+    /// Must be thread-safe.
+    requestRestart: *const fn (host: *const Host) callconv(.c) void,
+    /// Must be thread-safe.
+    requestProcess: *const fn (host: *const Host) callconv(.c) void,
+    /// Must be thread-safe.
+    requestCallback: *const fn (host: *const Host) callconv(.c) void,
+};
 
-        fn startProcessing(pl: *const Plugin) callconv(.C) bool {
-            return PluginType.startProcessing(castPluginType(PluginType, pl.plugin_data));
-        }
+pub const PluginDescriptor = extern struct {
+    clap_version: ClapVersion,
 
-        fn stopProcessing(pl: *const Plugin) callconv(.C) void {
-            PluginType.stopProcessing(castPluginType(PluginType, pl.plugin_data));
-        }
+    id: [*:0]const u8,
+    name: [*:0]const u8,
+    vendor: ?[*:0]const u8,
+    url: ?[*:0]const u8,
+    manual_url: ?[*:0]const u8,
+    support_url: ?[*:0]const u8,
+    version: ?[*:0]const u8,
+    description: ?[*:0]const u8,
 
-        fn reset(pl: *const Plugin) callconv(.C) void {
-            PluginType.reset(castPluginType(PluginType, pl.plugin_data));
-        }
+    features: ?[*:null]?[*:0]const u8,
+};
 
-        fn process(pl: *const Plugin, proc: *const Process) callconv(.C) Process.Status {
-            return PluginType.process(castPluginType(PluginType, pl.plugin_data), proc);
-        }
+pub const Plugin = extern struct {
+    descriptor: *const PluginDescriptor,
 
-        // TODO: Bindings for this
-        fn getExtension(pl: *const Plugin, id: [*:0]const u8) callconv(.C) ?*const anyopaque {
-            return PluginType.getExtension(castPluginType(PluginType, pl.plugin_data), std.mem.span(id));
-        }
+    plugin_data: ?*anyopaque,
 
-        fn onMainThread(pl: *const Plugin) callconv(.C) void {
-            PluginType.onMainThread(castPluginType(PluginType, pl.plugin_data));
-        }
+    /// Called on main thread.
+    init: *const fn (plugin: *const Plugin) callconv(.c) bool,
+    /// Called on main thread. Must be deactivated.
+    deinit: *const fn (plugin: *const Plugin) callconv(.c) void,
+    /// Called on main thread. Must be deactivated.
+    activate: *const fn (plugin: *const Plugin, sample_rate: f64, min_frames_count: u32, max_frames_count: u32) callconv(.c) bool,
+    /// Called on main thread. Must be activated.
+    deactivate: *const fn (plugin: *const Plugin) callconv(.c) void,
+    /// Called on audio thread. Must be activated and not processing.
+    startProcesing: *const fn (plugin: *const Plugin) callconv(.c) bool,
+    /// Called on audio thread. Must be activated and processing.
+    stopProcesing: *const fn (plugin: *const Plugin) callconv(.c) void,
+    /// Called on audio thread. Must be activated.
+    reset: *const fn (plugin: *const Plugin) callconv(.c) void,
+    /// Called on audio thread. Must be activated and processing.
+    process: *const fn (plugin: *const Plugin, process: *const Process) callconv(.c) Process.Status,
+    /// Must be thread-safe.
+    getExtension: *const fn (plugin: *const Plugin, extension_id: [*:0]const u8) callconv(.c) ?*const anyopaque,
+    /// Called on main thread after host.request_callback().
+    onMainThread: *const fn (plugin: *const Plugin) callconv(.c) void,
+};
+
+pub const Process = extern struct {
+    steady_time: i64,
+    frames_count: u32,
+    event_transport: ?*EventTransport,
+    audio_inputs: [*]const AudioBuffer,
+    audio_outputs: [*]AudioBuffer,
+    audio_inputs_count: u32,
+    audio_ouputs_count: u32,
+    /// Sorted in sample order.
+    input_events: *const InputEvents,
+    /// Must be sorted in sample order.
+    output_events: *const OutputEvents,
+
+    pub const Status = enum(i32) {
+        @"error" = 0,
+        @"continue" = 1,
+        continue_if_not_quiet = 2,
+        tail = 3,
+        sleep = 4,
+        _,
     };
-}
+};
 
-pub fn exportPlugins(
-    comptime functions: ExportFunctions,
-    plugins: anytype,
-) void {
-    const Factory = struct {
-        fn getPluginCount(_: *const Plugin.Factory) callconv(.C) u32 {
-            return plugins.len;
-        }
+pub const AudioBuffer = extern struct {
+    data_32: [*][*]f32,
+    data_64: [*][*]f64,
+    channel_count: u32,
+    latency: u32,
+    constant_mask: u64,
+};
 
-        fn getPluginDescriptor(_: *const Plugin.Factory, index: u32) callconv(.C) *const Plugin.Descriptor {
-            inline for (plugins, 0..) |Pl, i| {
-                if (i == index)
-                    return &Pl.descriptor;
-            }
+pub const EventTransport = extern struct {
+    header: EventHeader,
 
-            @panic("Attempted to get descriptor for non-existent plugin");
-        }
+    flags: Flags,
+    song_pos_beats: BeatTime,
+    song_pos_seconds: SecTime,
+    tempo: f64,
+    tempo_inc: f64,
+    loop_start_beats: BeatTime,
+    loop_end_beats: BeatTime,
+    loop_start_seconds: SecTime,
+    loop_end_seconds: SecTime,
+    bar_start: BeatTime,
+    bar_number: i32,
+    tsig_num: u16,
+    tsig_denom: u16,
 
-        fn createPlugin(
-            _: *const Plugin.Factory,
-            host: *const Host,
-            plugin_id: [*:0]const u8,
-        ) callconv(.C) *const Plugin {
-            _ = host;
-            inline for (plugins) |Pl| {
-                if (std.mem.eql(u8, std.mem.span(Pl.descriptor.id), std.mem.span(plugin_id))) {
-                    var plug = std.heap.page_allocator.create(Plugin) catch @panic("OOM");
-                    var data = std.heap.page_allocator.create(Pl) catch @panic("OOM");
-
-                    const stub = PluginStub(Pl);
-                    plug.* = .{
-                        .descriptor = &Pl.descriptor,
-
-                        .plugin_data = @ptrCast(*anyopaque, data),
-
-                        .init = &stub.init,
-                        .destroy = &stub.destroy,
-                        .activate = &stub.activate,
-                        .deactivate = &stub.deactivate,
-                        .startProcessing = &stub.startProcessing,
-                        .stopProcessing = &stub.stopProcessing,
-                        .reset = &stub.reset,
-                        .process = &stub.process,
-                        .getExtension = &stub.getExtension,
-                        .onMainThread = &stub.onMainThread,
-                    };
-                    return plug;
-                }
-            }
-
-            @panic("Attempted to create non-existent plugin");
-        }
+    pub const Flags = packed struct(u32) {
+        has_tempo: bool,
+        has_beats_timeline: bool,
+        has_seconds_timeline: bool,
+        has_time_signature: bool,
+        is_playing: bool,
+        is_recording: bool,
+        is_loop_active: bool,
+        is_within_pre_roll: bool,
+        padding: u24,
     };
+};
 
-    _ = struct {
-        fn init(plugin_path: [*:0]const u8) callconv(.C) bool {
-            if (functions.init) |i|
-                i(std.mem.span(plugin_path)) catch return false;
-            return true;
-        }
+pub const BeatTime = enum(i64) { _ };
+pub const SecTime = enum(i64) { _ };
 
-        fn deinit() callconv(.C) void {
-            if (functions.deinit) |d|
-                d();
-        }
+/// Sorted in sample order. Owned by host.
+pub const InputEvents = extern struct {
+    ctx: *anyopaque,
+    getSize: *const fn (input_events: *const InputEvents) callconv(.c) u32,
+    get: *const fn (input_events: *const InputEvents, index: u32) callconv(.c) *const EventHeader,
+};
 
-        fn getFactory(factory_id: [*:0]const u8) callconv(.C) ?*const Plugin.Factory {
-            if (std.mem.eql(u8, std.mem.span(factory_id), "clap.plugin-factory")) {
-                return &Plugin.Factory{
-                    .getPluginCount = &Factory.getPluginCount,
-                    .getPluginDescriptor = &Factory.getPluginDescriptor,
-                    .createPlugin = &Factory.createPlugin,
-                };
-            }
+/// Sorted in sample order. Owned by host.
+pub const OutputEvents = extern struct {
+    ctx: *anyopaque,
+    tryPush: *const fn (output_events: *const OutputEvents, event: *const EventHeader) callconv(.c) bool,
+};
 
-            return null;
-        }
+pub const EventHeader = extern struct {
+    /// Size including header.
+    size: u32,
+    time: u32,
+    space_id: SpaceId,
+    type: Type,
+    flags: Flags,
 
-        export const clap_entry = Plugin.Entry{
-            .init = &init,
-            .deinit = &deinit,
-            .getFactory = &getFactory,
-        };
+    pub const SpaceId = enum(u16) {
+        core = 0,
+        _,
     };
-}
+    pub const Type = enum(u16) {
+        note_on = 0,
+        note_off = 1,
+        note_choke = 2,
+        note_end = 3,
+        note_expression = 4,
+        param_value = 5,
+        param_mod = 6,
+        param_gesture_begin = 7,
+        param_gesture_end = 8,
+        transport = 9,
+        midi = 10,
+        midi_sysex = 11,
+        midi2 = 12,
+        _,
+    };
+    pub const Flags = packed struct(u32) {
+        is_live: bool,
+        dont_record: bool,
+        padding: u30,
+    };
+};
