@@ -54,7 +54,7 @@ pub const PluginFactory = extern struct {
     /// Must be thread-safe.
     getPluginCountFn: *const fn (plugin_factory: *const PluginFactory) callconv(.c) u32,
     /// Must be thread-safe.
-    getPluginDescriptorFn: *const fn (plugin_factory: *const PluginFactory, index: u32) callconv(.c) ?*const PluginDescriptor,
+    getPluginDescriptorFn: *const fn (plugin_factory: *const PluginFactory, index: u32) callconv(.c) ?*const Plugin.Descriptor,
     /// Must be thread-safe.
     createPluginFn: *const fn (plugin_factory: *const PluginFactory, host: *const Host, plugin_id: [*:0]const u8) callconv(.c) ?*const Plugin,
 
@@ -71,7 +71,7 @@ pub const PluginFactory = extern struct {
                 return plugins.len;
             }
 
-            fn getPluginDescriptor(plugin_factory: *const PluginFactory, index: u32) callconv(.c) ?*const PluginDescriptor {
+            fn getPluginDescriptor(plugin_factory: *const PluginFactory, index: u32) callconv(.c) ?*const Plugin.Descriptor {
                 _ = plugin_factory;
                 inline for (plugins, 0..) |PluginType, i| {
                     if (i == index) {
@@ -132,23 +132,8 @@ pub const Host = extern struct {
     }
 };
 
-pub const PluginDescriptor = extern struct {
-    clap_version: ClapVersion,
-
-    id: [*:0]const u8,
-    name: [*:0]const u8,
-    vendor: ?[*:0]const u8,
-    url: ?[*:0]const u8,
-    manual_url: ?[*:0]const u8,
-    support_url: ?[*:0]const u8,
-    version: ?[*:0]const u8,
-    description: ?[*:0]const u8,
-
-    features: ?[*:null]?[*:0]const u8,
-};
-
 pub const Plugin = extern struct {
-    descriptor: *const PluginDescriptor,
+    descriptor: *const Descriptor,
 
     plugin_data: ?*anyopaque,
 
@@ -172,6 +157,21 @@ pub const Plugin = extern struct {
     getExtensionFn: *const fn (plugin: *const Plugin, extension_id: [*:0]const u8) callconv(.c) ?*const anyopaque,
     /// Called on main thread after host.request_callback().
     onMainThreadFn: *const fn (plugin: *const Plugin) callconv(.c) void,
+
+    pub const Descriptor = extern struct {
+        clap_version: ClapVersion,
+
+        id: [*:0]const u8,
+        name: [*:0]const u8,
+        vendor: ?[*:0]const u8,
+        url: ?[*:0]const u8,
+        manual_url: ?[*:0]const u8,
+        support_url: ?[*:0]const u8,
+        version: ?[*:0]const u8,
+        description: ?[*:0]const u8,
+
+        features: ?[*:null]?[*:0]const u8,
+    };
 
     /// `T` must have a `descriptor: PluginDescriptor` decl
     ///
@@ -361,6 +361,7 @@ pub const AudioBuffer = extern struct {
 
 pub const BeatTime = enum(i64) { _ };
 pub const SecTime = enum(i64) { _ };
+pub const Id = enum(u32) { invalid = std.math.maxInt(u32), _ };
 
 pub const Event = struct {
     /// Sorted in sample order. Owned by host.
@@ -427,8 +428,76 @@ pub const Event = struct {
         };
     };
 
+    pub const Note = extern struct {
+        header: Header,
+
+        note_id: i32,
+        port_index: i16,
+        channel: i16,
+        key: i16,
+        velocity: f64,
+    };
+
+    pub const NoteExpression = extern struct {
+        header: Header,
+
+        expression_id: NoteExpression.Id,
+
+        note_id: i32,
+        port_index: i16,
+        channel: i16,
+        key: i16,
+
+        value: f64,
+
+        pub const Id = enum(i32) {
+            volume = 0,
+            pan = 1,
+            tuning = 2,
+            vibrato = 3,
+            expression = 4,
+            brightness = 5,
+            pressure = 6,
+            _,
+        };
+    };
+
+    pub const ParamValue = extern struct {
+        header: Header,
+
+        param_id: Id,
+        cookie: *anyopaque,
+
+        note_id: i32,
+        port_index: i16,
+        channel: i16,
+        key: i16,
+
+        value: f64,
+    };
+
+    pub const ParamMod = extern struct {
+        header: Header,
+
+        param_id: Id,
+        cookie: *anyopaque,
+
+        note_id: i32,
+        port_index: i16,
+        channel: i16,
+        key: i16,
+
+        amount: f64,
+    };
+
+    pub const ParamGesture = extern struct {
+        header: Header,
+
+        param_id: Id,
+    };
+
     pub const Transport = extern struct {
-        header: Event.Header,
+        header: Header,
 
         flags: Flags,
         song_pos_beats: BeatTime,
@@ -455,5 +524,27 @@ pub const Event = struct {
             is_within_pre_roll: bool,
             padding: u24,
         };
+    };
+
+    pub const Midi = extern struct {
+        header: Header,
+
+        port_index: u16,
+        data: [3]u8,
+    };
+
+    pub const MidiSysex = extern struct {
+        header: Header,
+
+        port_index: u16,
+        buffer_ptr: [*]const u8,
+        buffer_len: u32,
+    };
+
+    pub const Midi2 = extern struct {
+        header: Header,
+
+        port_index: u16,
+        data: [4]u32,
     };
 };

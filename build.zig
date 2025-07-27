@@ -10,40 +10,32 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/clap.zig"),
     });
 
-    {
-        const gain = b.addLibrary(.{
-            .name = "zig-gain",
-            .linkage = .dynamic,
-            .root_module = b.createModule(.{
-                .target = target,
-                .optimize = optimize,
-                .root_source_file = b.path("examples/gain.zig"),
-                .imports = &.{
-                    .{ .name = "clap", .module = clap },
-                },
-                .link_libc = true,
-            }),
-        });
-        b.getInstallStep().dependOn(&b.addInstallArtifact(gain, .{
-            .dest_dir = .{ .override = .bin },
-            .dest_sub_path = "zig-gain.clap",
-        }).step);
-    }
+    const check = b.step("check", "check for compile errors");
 
-    {
-        const gain = b.addLibrary(.{
-            .name = "gain",
-            .linkage = .dynamic,
-            .root_module = b.createModule(.{
-                .target = target,
-                .optimize = optimize,
-                .root_source_file = b.path("examples/gain.zig"),
-                .imports = &.{
-                    .{ .name = "clap", .module = clap },
-                },
-                .link_libc = true,
-            }),
-        });
-        b.step("check", "").dependOn(&gain.step);
-    }
+    const examples = addCheckedSharedLibrary(check, .{
+        .name = "zig-clap-examples",
+        .linkage = .dynamic,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .root_source_file = b.path("examples/root.zig"),
+            .imports = &.{
+                .{ .name = "clap", .module = clap },
+            },
+            .link_libc = true,
+        }),
+    });
+    b.getInstallStep().dependOn(&b.addInstallArtifact(examples, .{
+        .dest_dir = .{ .override = .bin },
+        .dest_sub_path = "zig-clap-examples.clap",
+    }).step);
+}
+
+fn addCheckedSharedLibrary(
+    check: *std.Build.Step,
+    options: std.Build.LibraryOptions,
+) *std.Build.Step.Compile {
+    const b = check.owner;
+    check.dependOn(&b.addLibrary(options).step);
+    return b.addLibrary(options);
 }
